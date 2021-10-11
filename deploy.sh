@@ -18,6 +18,8 @@ mkdir -p /tmp/mnt
 mount -t msdos "${disk}" /tmp/mnt &> /dev/null
 
 cp build/release.BOOTX64.EFI /tmp/mnt/EFI/Boot/BOOTX64.EFI
+cp drive/text.txt /tmp/mnt/text.txt
+cp build/kernel.bin /tmp/mnt/kernel.bin
 
 
 # Unmount and detach the disk.

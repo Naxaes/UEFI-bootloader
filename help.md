@@ -31,11 +31,9 @@ You might need to change the deploy script's permissions to be executable.
 
 
 # Things to know:
-* Freestanding mode might require the existence of the symbols memset,
-  memcpy, memmove and memcmp. If your program crashes due to *"undefined
-  reference to 'memcpy'"* or similar, then you must provide them.
-* If you get *"undefined reference to '___chkstk_ms'"*, it's because gcc
-  linked with libgcc, so pass -lgcc to solve it.
+* Freestanding mode might require the existence of the symbols memset, memcpy, memmove and memcmp. If your program crashes due to *"undefined reference to 'memcpy'"* or similar, then you must provide them.
+* If you get *"undefined reference to '___chkstk_ms'"*, it's because gcc linked with libgcc, so pass -lgcc to solve it.
+* The text isn't drawn from the edge while the `GraphicsOutput` is. This is expected, not a bug.
 
 
 # Debugging

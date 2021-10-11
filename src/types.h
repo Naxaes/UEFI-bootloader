@@ -24,34 +24,17 @@ typedef u16 char16;
 typedef size_t  usize;
 typedef ssize_t isize;
 
-
-typedef struct Block {
-    void*  data;
+typedef struct Array {
+    u8*    data;
     size_t size;
-} Block;
-
-
-
-typedef Block (*AllocateFn)(size_t);
-typedef void  (*DeallocateFn)(Block);
-typedef struct Allocator {
-    AllocateFn   Allocate;
-    DeallocateFn Deallocate;
-} Allocator;
-
-
-typedef Block Array;
-
+} Array;
 
 typedef struct String {
-    char8*  data;
+    char16*  data;
     size_t  size;
 } String;
-typedef struct WString {
-    char16* data;
-    size_t  size;
-} WString;
-#define LITERAL_TO_STRING(x) ((const String) { .data=(char8 *) x, .size=sizeof(x) })
+
+#define LITERAL_TO_STRING(x) ((const String) { .data=(char16 *) L##x, .size=sizeof(x) })
 
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 

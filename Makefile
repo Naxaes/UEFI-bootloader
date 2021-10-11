@@ -39,7 +39,7 @@ $(TARGET): src/efi_main.c $(BUILD_DIR)
 
 
 # TODO(ted): Create a target for generating drive/drive.hdd.
-deploy: $(EFI_IMAGE) $(BUILD_DIR)
+deploy: $(BUILD_DIR) $(EFI_IMAGE) kernel
 	./deploy.sh
 
 
@@ -60,6 +60,10 @@ run: drive/drive.hdd deploy
 # will make qemu terminate on ctrl-C instead of pausing the program.
 debug: drive/drive.hdd deploy
 	qemu-system-x86_64 -S -s -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35 &
+
+
+kernel: src/kernel.c
+	$(CC) -Wall -Werror -m64 -Wl,--oformat=binary -e main -c $< -o $(BUILD_DIR)/$@.bin
 
 
 clean:
