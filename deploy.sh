@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
 
+# Create the hdd file.
+# hdiutil create -fs fat32 -ov -size 48m -volname NEWOS -format UDTO -srcfolder diskImage uefi.cdr
+
+
 # Attach our drive as a virtual disk image.
 # We'll get information of multiple disks images back, for example the
 # path for "GUID_partition_scheme" and "Microsoft Basic Data".
@@ -19,7 +23,8 @@ mount -t msdos "${disk}" /tmp/mnt &> /dev/null
 
 cp build/release.BOOTX64.EFI /tmp/mnt/EFI/Boot/BOOTX64.EFI
 cp drive/text.txt /tmp/mnt/text.txt
-cp build/kernel.bin /tmp/mnt/kernel.bin
+cp drive/default-font.psf /tmp/mnt/default-font.psf
+cp build/kernel /tmp/mnt/kernel
 
 
 # Unmount and detach the disk.

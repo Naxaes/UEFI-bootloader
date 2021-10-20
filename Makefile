@@ -1,11 +1,14 @@
+# https://www.systutorials.com/docs/linux/man/1-x86_64-w64-mingw32-gcc/
 OBJCOPY :=x86_64-w64-mingw32-objcopy
 CC      :=x86_64-w64-mingw32-gcc
+LD		:=x86_64-w64-mingw32-ld
+QEMU	:=qemu-system-x86_64
 
 CFLAGS  :=-Wall -Werror -m64 -ffreestanding -Og -ggdb
 LFLAGS  :=-nostdlib -lgcc -shared -Wl,-dll -Wl,--subsystem,10 -e efi_main -o
 
 # This file name is what UEFI looks for in EFI/BOOT folder.
-TARGET			:= BOOTX64.EFI
+EFI_TARGET		:= BOOTX64.EFI
 EFI_IMAGE 		:= release.BOOTX64.EFI
 EFI_DEBUG_IMAGE := debug.BOOTX64.EFI
 
@@ -25,15 +28,15 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 
-$(EFI_IMAGE): $(TARGET) $(BUILD_DIR)
+$(EFI_IMAGE): $(EFI_TARGET) $(BUILD_DIR)
 	$(OBJCOPY) $(foreach sec,$(SECTIONS),-j $(sec)) --target=efi-app-x86_64 $(BUILD_DIR)/$< $(BUILD_DIR)/$@
 
 
-$(EFI_DEBUG_IMAGE): $(TARGET) $(BUILD_DIR)
+$(EFI_DEBUG_IMAGE): $(EFI_TARGET) $(BUILD_DIR)
 	$(OBJCOPY) $(foreach sec,$(SECTIONS) $(DEBUG_SECTIONS),-j $(sec)) --target=efi-app-x86_64 $(BUILD_DIR)/$< $(BUILD_DIR)/$@
 
 
-$(TARGET): src/efi_main.c $(BUILD_DIR)
+$(EFI_TARGET): src/efi_main.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $(BUILD_DIR)/$@
 	$(CC) $< $(LFLAGS) $(BUILD_DIR)/$@
 
@@ -43,10 +46,10 @@ deploy: $(BUILD_DIR) $(EFI_IMAGE) kernel
 	./deploy.sh
 
 
-run: drive/drive.hdd deploy
+run: $(BUILD_DIR) kernel drive/drive.hdd deploy
 	# Qemu needs the bios64.bin file, but it's necessary for real hardware.
 	# bios64.bin on real hardware is just the motherboard firmware.
-	qemu-system-x86_64 -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35
+	$(QEMU) -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35
 
 
 # https://wiki.osdev.org/Debugging_UEFI_applications_with_GDB
@@ -58,12 +61,19 @@ run: drive/drive.hdd deploy
 
 # Unfortunately, running x86_64-elf-gdb -ex "target remote localhost:1234"
 # will make qemu terminate on ctrl-C instead of pausing the program.
-debug: drive/drive.hdd deploy
-	qemu-system-x86_64 -S -s -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35 &
+debug: kernel drive/drive.hdd deploy
+	$(QEMU) -S -s -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35 &
 
 
+# Using 'main' as entry point will make gcc complain about not having `int argv`
+# and `char* argv[]` as arguments, so use something else (like `start`) instead.
+# -v  - Verbose output. The commands the linker runs during compilation.
+# -mcmodel=kernel  - Generate code for the kernel code model.
+# -fno-asynchronous-unwind-tables - Disable generation of DWARF-based unwinding.
 kernel: src/kernel.c
-	$(CC) -Wall -Werror -m64 -Wl,--oformat=binary -e main -c $< -o $(BUILD_DIR)/$@.bin
+	x86_64-elf-gcc -mcmodel=kernel -fno-asynchronous-unwind-tables -march=x86-64 --freestanding -Wall -Werror -pedantic -m64 -Og -ggdb -c $< -o $(BUILD_DIR)/$@.o
+	x86_64-elf-ld  -nostdlib -e start $(BUILD_DIR)/$@.o -o  $(BUILD_DIR)/$@
+	#$(OBJCOPY) -O binary $(BUILD_DIR)/$@.exe $(BUILD_DIR)/$@.bin
 
 
 clean:

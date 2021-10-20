@@ -22,7 +22,7 @@ typedef u8  char8;
 typedef u16 char16;
 
 typedef size_t  usize;
-typedef ssize_t isize;
+//typedef ssize_t isize;
 
 typedef struct Array {
     u8*    data;

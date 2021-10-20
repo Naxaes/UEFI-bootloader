@@ -15,6 +15,7 @@ void* memcpy(void* destination, const void* source, size_t size)
 void* memset(void* source, int value, size_t size)
 {
     u8* pointer = (u8 *) source;
-    while (size--) *pointer++ = (unsigned char) value;
+    while (size--)
+        *pointer++ = (unsigned char) value;
     return source;
 }

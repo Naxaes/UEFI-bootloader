@@ -1,18 +1,17 @@
+#include <stdarg.h>
+
 #include "efi_main.h"
 #include "efi_error.h"
+
+#include "bootloader.h"
+
+#include "elf.h"
 
 #include "format.c"
 #include "memory.c"
 
-// https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/drivers/firmware/efi/libstub/x86-stub.c
-typedef struct Graphics {
-    u8* base;
-    u64 size;
-    u32 width;
-    u32 height;
-    u32 pixels_per_scanline;
-} Graphics;
 
+// https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/drivers/firmware/efi/libstub/x86-stub.c
 EFI_SYSTEM_TABLE*      g_SystemTable;
 EFI_BOOT_SERVICES*     g_BootServices;
 EFI_RUNTIME_SERVICES*  g_RuntimeServices;
@@ -41,6 +40,16 @@ const CHAR16* EFI_MEMORY_TYPE_STRINGS[] = {
 };
 
 
+void EfiHalt()
+{
+    // Change to 0 in debugger to continue.
+    int volatile wait = 1;
+    while (wait) {
+        __asm__ __volatile__("pause");
+    }
+}
+
+
 void EfiDelay(UINTN ms)
 {
     // The Stall function is set as microseconds. We stall 1 microsecond.
@@ -48,16 +57,122 @@ void EfiDelay(UINTN ms)
 }
 
 
-void EfiSetTextPosition(UINT32 Col, UINT32 Row)
+void EfiSetCursorPosition(UINT32 Col, UINT32 Row)
 {
     // Sets the Column and Row of the text screen cursor position.
     g_SystemTable->ConOut->SetCursorPosition(g_SystemTable->ConOut, Col, Row);
 }
 
+void EfiGetCursorPosition(INT32* x, INT32* y)
+{
+    *x = g_SystemTable->ConOut->Mode->CursorColumn;
+    *y = g_SystemTable->ConOut->Mode->CursorRow;
+}
 
-void EfiPrint(const CHAR16* string)
+
+void EfiPrintString(const CHAR16* string)
 {
     g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string);
+}
+
+void EfiPrintChar(CHAR16 character)
+{
+    CHAR16 string[] = { character, L'\0' };
+    g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string);
+}
+
+
+void EfiPrintF(const CHAR16* format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+
+    const CHAR16* character = format;
+    while (*character != L'\0')
+    {
+//        if (*character == '\t')
+//        {
+//            INT32 x = 0;
+//            INT32 y = 0;
+//            EfiGetCursorPosition(&x, &y);
+//            EfiSetCursorPosition(x + (TAB_SIZE - (x % TAB_SIZE)), y);
+//
+//            character++;
+//        }
+        if (*character != L'%')
+        {
+            EfiPrintChar(*character);
+            character++;
+        }
+        else
+        {
+            character++;
+            switch (*character)
+            {
+                case L'c':
+                {
+                    CHAR16 i = va_arg(arg, int);  // Fetch char argument
+                    EfiPrintChar(i);
+                    break;
+                }
+                case L'd' :
+                {
+                    int i = va_arg(arg, int);  // Fetch Decimal/Integer argument
+                    if (i < 0)
+                    {
+                        i = -i;
+                        EfiPrintChar(L'-');
+                    }
+                    EfiPrintString(U64ToString(i, 10).data);
+                    break;
+                }
+                case L'o':
+                {
+//                    i = va_arg(arg,
+//                    unsigned int); //Fetch Octal representation
+//                    puts(convert(i, 8));
+                    break;
+                }
+                case L's':
+                {
+                    CHAR16* s = va_arg(arg, CHAR16*);       //Fetch string
+                    EfiPrintString(s);
+                    break;
+                }
+                case L'x':
+                {
+                    unsigned int i = va_arg(arg, unsigned int); //Fetch Hexadecimal representation
+                    EfiPrintString(ToHexStringTruncated(i).data);
+                    break;
+                }
+                case L'z':  // size_t or ssize_t
+                {
+                    character++;
+                    if (*character == L'u')
+                    {
+                        usize x = va_arg(arg, usize);
+                        EfiPrintString(U64ToString(x, 10).data);
+                        break;
+                    }
+                    else
+                    {
+//                        EFI_ASSERT(EFI_ERROR);
+                        return;
+                    }
+                }
+                default:
+                {
+//                    EFI_ASSERT(EFI_ERROR);
+                    return;
+                }
+            }
+            character++;
+        }
+
+    }
+
+    //Module 3: Closing argument list to necessary clean-up
+    va_end(arg);
 }
 
 
@@ -67,9 +182,8 @@ void EfiAssert(EFI_STATUS status, const CHAR16* file, int line)
     if ((status & EFI_ERROR) == EFI_ERROR)
     {
         g_SystemTable->ConOut->SetAttribute(g_SystemTable->ConOut, EFI_RED);
-        EfiPrint(L"[ASSERT FAILED]: ");
-        EfiPrint(EfiErrorString(status));
-        EfiPrint(L"\r\n");
+        EfiPrintF(L"[ASSERT FAILED] (%s:%d): '%s'\n\r", file, line, EfiErrorString(status));
+        EfiHalt();
     }
 }
 
@@ -89,15 +203,16 @@ EFI_STATUS EfiKeyboardPoll(EFI_INPUT_KEY* Key)
 
 void EfiKeyboardWait()
 {
-    UINTN Index;
-    EFI_ASSERT(g_BootServices->WaitForEvent(
-        1,
-        &g_SystemTable->ConIn->WaitForKey,
-        &Index
-    ));
+    // TODO(ted): This works only once... Why?
+//    UINTN Index;
+//    EFI_ASSERT(g_BootServices->WaitForEvent(
+//        1,
+//        &g_SystemTable->ConIn->WaitForKey,
+//        &Index
+//    ));
 
-//    EFI_INPUT_KEY Key;
-//    while (g_SystemTable->ConIn->ReadKeyStroke(g_SystemTable->ConIn, &Key) == EFI_NOT_READY);
+    EFI_INPUT_KEY Key;
+    while (g_SystemTable->ConIn->ReadKeyStroke(g_SystemTable->ConIn, &Key) == EFI_NOT_READY);
 //    return Key;
 }
 
@@ -175,15 +290,8 @@ EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* EfiInitializeFileSystem(EFI_HANDLE ImageHandle)
         (void **) &Volume
     ));
 
-    EfiPrint(L"Image loaded at: ");
-    EfiPrint(ToHexString((usize) LoadedImage->ImageBase).data);
-    EfiPrint(L"\n\r");
-
-    EfiPrint(L"Image size: ");
-    EfiPrint(ToHexString((usize) LoadedImage->ImageSize).data);
-    EfiPrint(L"\n\r");
-
-
+    EfiPrintF(L"Image loaded at: %x\n\r", (usize) LoadedImage->ImageBase);
+    EfiPrintF(L"Image size:      %x\n\r", (usize) LoadedImage->ImageSize);
 
     return Volume;
 }
@@ -219,20 +327,11 @@ Array EfiReadFile(EFI_FILE_PROTOCOL* File, UINTN size)
     }
     else
     {
-        EfiPrint(L"[ERROR]: No file handle was given!\n\r");
+        EfiPrintF(L"[ERROR]: No file handle was given!\n\r");
         return (Array) { .data=NULL, .size=0 };
     }
 }
 
-
-void EfiHalt()
-{
-    // Change to 0 in debugger to continue.
-    int volatile wait = 1;
-    while (wait) {
-        __asm__ __volatile__("pause");
-    }
-}
 
 void EfiInitScreen()
 {
@@ -256,11 +355,11 @@ void EfiInitGraphics()
 
     if (!GraphicsOutput)
     {
-        EfiPrint(L"Couldn't initialize Graphics!\n\r");
+        EfiPrintF(L"Couldn't initialize Graphics!\n\r");
         return;
     }
 
-    g_Graphics.base   = (u8*) GraphicsOutput->Mode->FrameBufferBase;
+    g_Graphics.base   = (Pixel *) GraphicsOutput->Mode->FrameBufferBase;
     g_Graphics.size   = GraphicsOutput->Mode->FrameBufferSize;
     g_Graphics.width  = GraphicsOutput->Mode->Info->HorizontalResolution;
     g_Graphics.height = GraphicsOutput->Mode->Info->VerticalResolution;
@@ -280,12 +379,7 @@ void EfiInit(EFI_SYSTEM_TABLE* SystemTable)
     EfiKeyboardReset();
     EfiInitGraphics();
 
-    EfiPrint(L"---- UEFI bootloader up and running! ----\n\r");
-//    for (int i = 0; i < 40; ++i)
-//    {
-//        EfiDelay(1000000);
-//        g_Graphics->base[i] = 0x75;
-//    }
+    EfiPrintF(L"---- UEFI bootloader up and running! ----\n\r");
 }
 
 
@@ -300,9 +394,7 @@ void EfiCurrentTime()
     EFI_ASSERT(g_RuntimeServices->GetTime(Time, NULL));
     CHAR16 Hour[] = { L'0' + Time->Hour / 10, L'0' + Time->Hour % 10, 0 };
 
-    EfiPrint(L"Current hour: ");
-    EfiPrint(Hour);
-    EfiPrint(L"\n\r");
+    EfiPrintF(L"Current hour: %s\n\r", Hour);
 }
 
 void EfiLoadTest(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
@@ -311,39 +403,13 @@ void EfiLoadTest(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
     Array content = EfiReadFile(File, 0x1000);
     if (content.data)
     {
-        EfiPrint(L"Content is: ");
-        EfiPrint((const CHAR16 *) content.data);
-        EfiPrint(L"\n\r");
-    }
-}
-
-
-void EfiLoadKernel(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
-{
-    EFI_FILE_PROTOCOL* KernelFile = EfiOpenFile(Volume, L"kernel.bin");
-    Array KernelSource = EfiReadFile(KernelFile, 0x10000);
-    if (KernelSource.data)
-    {
-        // g_SystemTable->BootServices->ExitBootServices()
-
-        typedef __attribute__((ms_abi)) int (*KernelMainFn)();
-
-        // usize entry_point = 0x104;
-        u8* KernelMain = &KernelSource.data[0x104];
-
-        EfiPrint(L"Running Kernel...\n\r");
-        KernelMainFn kernel_main = (KernelMainFn) KernelMain;
-        int result = kernel_main();
-
-        EfiPrint(L"Kernel exited with status code ");
-        EfiPrint(ToHexString((usize) result).data);
-        EfiPrint(L"\n\r");
+        EfiPrintF(L"Content is: '%s'\n\r", content.data);
     }
 }
 
 
 // UEFI-spec page. 172
-void EfiMemoryMap()
+UINTN EfiMemoryMap()
 {
     UINTN  MemoryMapSize     = 0;
     EFI_MEMORY_DESCRIPTOR* MemoryMap = NULL;
@@ -375,6 +441,11 @@ void EfiMemoryMap()
         &DescriptorVersion
     ));
 
+    return MapKey;
+}
+
+void EfiPrintMemoryMap(UINTN MemoryMapSize, EFI_MEMORY_DESCRIPTOR* MemoryMap, UINTN DescriptorSize)
+{
     usize MapEntries = MemoryMapSize / DescriptorSize;
     u64 TotalRam = 0;
     for (usize i = 0; i < MapEntries; ++i)
@@ -387,24 +458,191 @@ void EfiMemoryMap()
 
         if (i % 2 == 0)
         {
-            EfiSetTextPosition(0, i / 2 + 1);
-            EfiPrint(EFI_MEMORY_TYPE_STRINGS[desc->Type]);
-            EfiPrint(L" - ");
-            EfiPrint(U64ToString(kb, 10).data);
+            EfiPrintF(L"%s - %zu\t - ", EFI_MEMORY_TYPE_STRINGS[desc->Type], kb);
         }
         else
         {
-            EfiSetTextPosition(32, i / 2 + 1);
-            EfiPrint(EFI_MEMORY_TYPE_STRINGS[desc->Type]);
-            EfiPrint(L" - ");
-            EfiPrint(U64ToString(kb, 10).data);
+            EfiPrintF(L"%s - %zu\n\r", EFI_MEMORY_TYPE_STRINGS[desc->Type], kb);
         }
-
-        EfiDelay(100000);
     }
 
-    EfiPrint(L"Total memory: ");
-    EfiPrint(U64ToString(TotalRam, 10).data);
+    EfiPrintF(L"Total memory: %zu\n\r", TotalRam);
+}
+
+
+// UEFI-spec page. 172
+Memory EfiExitBootServices(EFI_HANDLE ImageHandle)
+{
+    // The call between GetMemoryMap and ExitBootServices must be done
+    // without any additional UEFI-calls (including print, as it could
+    // potentially) allocate resources and invalidate the memory map.
+
+    UINTN  MemoryMapSize     = 0;
+    EFI_MEMORY_DESCRIPTOR* MemoryMap = NULL;
+    UINTN  MapKey            = 0;
+    UINTN  DescriptorSize    = 0;
+    UINT32 DescriptorVersion = 0;
+
+    // Will fail with too small buffer, but return the size.
+    g_BootServices->GetMemoryMap(
+            &MemoryMapSize,
+            MemoryMap,
+            &MapKey,
+            &DescriptorSize,
+            &DescriptorVersion
+    );
+
+    MemoryMapSize += 2 * DescriptorSize;
+    EFI_ASSERT(g_BootServices->AllocatePool(
+            EfiLoaderData,
+            MemoryMapSize,
+            (void **) &MemoryMap
+    ));
+
+    EFI_ASSERT(g_BootServices->GetMemoryMap(
+            &MemoryMapSize,
+            MemoryMap,
+            &MapKey,
+            &DescriptorSize,
+            &DescriptorVersion
+    ));
+
+
+    EFI_ASSERT(g_SystemTable->BootServices->ExitBootServices(
+        ImageHandle, MapKey
+    ));
+
+    return (Memory) {
+        .MemoryMap=MemoryMap,
+        .MemoryMapSize=MemoryMapSize,
+        .DescriptorSize=DescriptorSize
+    };
+}
+
+
+PSF1_Font EfiLoadFont(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
+{
+    PSF1_Font font = { .scale=1 };
+
+    EFI_FILE_PROTOCOL* File = EfiOpenFile(Volume, L"default-font.psf");
+    if (File)
+    {
+        EfiPrintF(L"Loading font!\n\r");
+        UINTN size = sizeof(PSF1_Header);
+        EFI_ASSERT(File->Read(File, &size, &font.header));
+
+        if (font.header.magic[0] != 0x36 || font.header.magic[1] != 0x04)
+        {
+            EfiPrintF(L"Wrong magic number for font!\n\r");
+            EfiHalt();
+        }
+        EfiPrintF(L"Font validated!\n\r");
+
+        size = font.header.font_height * 256;
+        if (font.header.file_mode == 1)
+            size = font.header.font_height * 512;
+
+        EFI_ASSERT(File->SetPosition(File, sizeof(PSF1_Header)));
+        EFI_ASSERT(g_BootServices->AllocatePool(EfiLoaderData, size, (void**)&font.glyphs));
+        EfiPrintF(L"Size: %d\n\r", size);
+        EFI_ASSERT(File->Read(File, &size, font.glyphs));
+
+        EfiPrintF(L"Font Loaded!\n\r");
+    }
+
+    return font;
+}
+
+
+int EfiLoadElf(EFI_HANDLE ImageHandle, EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume, u8* data)
+{
+    PSF1_Font font = EfiLoadFont(Volume);
+
+    if (!is_elf64(data))
+        return ELF_ERROR;
+
+    const Elf64Header*        header   = (Elf64Header*) data;
+    const Elf64ProgramHeader* programs = (Elf64ProgramHeader*) (data + header->program_header_offset);
+//    const Elf64SectionHeader* section  = (Elf64SectionHeader*) (data + header->section_header_offset);
+
+    // https://wiki.osdev.org/ELF
+    for (int i = 0; i < header->program_header_entries; ++i)
+    {
+        const Elf64ProgramHeader* program = &programs[i];
+
+        if (program->type == PT_LOAD)
+        {
+            // Allocate `size` virtual memory at `address` and copy from
+            // source to destination.
+            // If the file_size and memory_size members differ,
+            // the segment is padded with zeros.
+
+            uint64_t destination = program->virtual_address;
+            uint64_t dest_size   = program->memory_size;
+
+            const uint8_t* source = data + program->file_offset;
+            uint64_t source_size  = program->file_size;
+
+            EfiPrintF(L"Sizes %d to %d\r\n", (u64)dest_size, source_size);
+            EFI_ASSERT(dest_size >= source_size ? EFI_SUCCESS : EFI_ERROR);
+
+            EfiPrintF(L"Mapping %x to %x\r\n", (u64)source, destination);
+            memcpy((void *)destination, source, source_size);
+            EfiPrintF(L"Done!\r\n");
+        }
+    }
+
+    EfiPrintF(L"Entry point: %x\r\n", header->entry_point);
+
+    typedef __attribute__((sysv_abi)) int (*elf_main_fn)(Context*);
+
+    void* entry_point_address = (void *) header->entry_point;
+    elf_main_fn entry_point = (elf_main_fn) entry_point_address;
+
+    Memory memory = EfiExitBootServices(ImageHandle);
+    Context context = {
+        .memory=memory,
+        .graphics=g_Graphics,
+        .services=g_RuntimeServices,
+        .font=font,
+    };
+
+    int result = entry_point(&context);
+    return result;
+}
+
+
+int EfiLoadKernel(EFI_HANDLE ImageHandle, EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
+{
+    EFI_FILE_PROTOCOL* KernelFile = EfiOpenFile(Volume, L"kernel");
+    Array KernelSource = EfiReadFile(KernelFile, 0x10000);
+    if (KernelSource.data)
+    {
+        u8* s = KernelSource.data;
+        u16 format = *(u16*)s;
+        if (format == 0x8664)  // X86_64 (COFF?)
+        {
+            EfiPrintF(L"Loading x86_64 kernel\n\r");
+            u16 entry_point = *((u16*) &s[0x24]);
+            Memory memory = EfiExitBootServices(ImageHandle);
+            typedef __attribute__((ms_abi)) int (*KernelMainFn)(EFI_RUNTIME_SERVICES*, Graphics, Memory);
+            u8* KernelMain = &KernelSource.data[entry_point];
+            KernelMainFn kernel_main = (KernelMainFn) KernelMain;
+            int result = kernel_main(g_RuntimeServices, g_Graphics, memory);
+            return result;
+        }
+        else if (*(u32*)s == 0x464C457F)
+        {
+            return EfiLoadElf(ImageHandle, Volume, KernelSource.data);
+        }
+        else
+        {
+            EfiPrintF(L"Error at line %d!\n\r", __LINE__);
+            return -1;
+        }
+    }
+
+    return -1;
 }
 
 
@@ -414,36 +652,39 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume = EfiInitializeFileSystem(ImageHandle);
 
-    EfiPrint(L"Press 'q' to shutdown | Press 'r' to reboot | Press 's' to start\n\r");
+    EfiLoadKernel(ImageHandle, Volume);
+    EfiHalt();
+
+
+    EfiPrintF(L"Press 'q' to shutdown | Press 'r' to reboot | Press 's' to start\n\r");
     while (1)
     {
         EFI_INPUT_KEY Key = {};
         if (EfiKeyboardPoll(&Key) == EFI_SUCCESS)
         {
-            if (Key.UnicodeChar == 'q')
+            if (Key.UnicodeChar == L'q')
             {
                 EfiShutdown();
-                break;
+                return EFI_SUCCESS;
             }
-            else if (Key.UnicodeChar == 'r')
+            else if (Key.UnicodeChar == L'r')
             {
                 EfiSoftwareReboot();
-                break;
+                return EFI_SUCCESS;
             }
-            else if (Key.UnicodeChar == 's')
+            else if (Key.UnicodeChar == L's')
             {
-                EfiLoadKernel(Volume);
+                EfiLoadKernel(ImageHandle, Volume);
+                EfiHalt();
+                EfiShutdown();
+                return EFI_SUCCESS;
             }
             else
             {
-                CHAR16 Temp[] = { Key.UnicodeChar, 0 };
-                EfiPrint(L"Please chose a valid key, not '");
-                EfiPrint(Temp);
-                EfiPrint(L"'...\n\r");
+                EfiPrintF(L"Please chose a valid key, not '%c'\n\r", Key.UnicodeChar);
             }
         }
     }
-
 
     return EFI_SUCCESS;
 }
