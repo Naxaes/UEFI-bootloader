@@ -1,0 +1,5 @@
+http://www.brokenthorn.com/Resources/OSDevIndex.html
+
+
+-- Maybe good --
+https://www.intel.com/content/www/us/en/developer/articles/tool/unified-extensible-firmware-interface.html

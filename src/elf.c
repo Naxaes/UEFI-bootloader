@@ -1,3 +1,5 @@
+// TODO(ted): This file is currently just for testing on an existing OS.
+
 #include "elf.h"
 
 #include <stddef.h>
@@ -7,6 +9,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+
 
 int load_elf64(const uint8_t* data)
 {

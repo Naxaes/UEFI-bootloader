@@ -34,7 +34,7 @@ typedef struct String {
     size_t  size;
 } String;
 
-#define LITERAL_TO_STRING(x) ((const String) { .data=(char16 *) L##x, .size=sizeof(x) })
+//#define LITERAL_TO_STRING(x) ((const String) { .data=(char16 *) L##x, .size=sizeof(x) })
 
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 

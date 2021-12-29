@@ -1,7 +1,7 @@
 #pragma once
 // Things that are shared between the bootloader and the kernel.
 
-#include "efi_main.h"
+#include "bootloader/efi_main.h"
 #include "types.h"
 
 
@@ -13,11 +13,11 @@ typedef struct Pixel {
 } Pixel;
 
 typedef struct Graphics {
-    volatile Pixel* base;
-    u64     size;
-    u32     width;
-    u32     height;
-    u32     pixels_per_scanline;
+    Pixel* base;
+    u64    size;
+    u32    width;
+    u32    height;
+    u32    pixels_per_scanline;
 } Graphics;
 
 typedef struct Memory {

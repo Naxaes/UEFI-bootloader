@@ -2,21 +2,14 @@
 
 #include <stdint.h>
 
-typedef enum ElfResult {
-    ELF_NO  = 0,
-    ELF_YES = 1,
-    ELF_ERROR = -1
-} ElfResult;
 
-
-ElfResult is_elf64(const uint8_t* source)
+int is_elf64(const uint8_t* source)
 {
     if (source[4] == 1)
-        return ELF_NO;
+        return 0;
     else if (source[4] == 2)
-        return ELF_YES;
-    else
-        return ELF_ERROR;  // Invalid
+        return 1;
+    return -1;
 }
 
 
