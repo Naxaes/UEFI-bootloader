@@ -10,7 +10,6 @@
 #include <string.h>
 #include <assert.h>
 
-
 int load_elf64(const uint8_t* data)
 {
     if (!is_elf64(data))

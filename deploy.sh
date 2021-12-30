@@ -30,7 +30,3 @@ cp build/kernel /tmp/mnt/kernel
 # Unmount and detach the disk.
 umount /tmp/mnt
 hdiutil detach $disk
-
-# Qemu needs the bios64.bin file, but it's necessary for real hardware.
-# bios64.bin on real hardware is just the motherboard firmware.
-#qemu-system-x86_64 -drive format=raw,file=drive/drive.hdd -bios qemu/bios64.bin -m 256M -vga std -name TedOS -machine q35

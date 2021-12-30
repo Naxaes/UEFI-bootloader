@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 99)
 
 
 # These are only here to provide intellisense for CLion.
-add_executable(not_actually_a_target1 ../src/kernel.cpp)
+add_executable(not_actually_a_target1 ../src/kernel.c)
 add_executable(not_actually_a_target2 ../src/efi_main.c)
 
 

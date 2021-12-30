@@ -132,7 +132,7 @@ struct EFI_GUID EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID    = {0x9042a9de,  0x23dc, 0x4
 struct EFI_GUID EFI_LOADED_IMAGE_PROTOCOL_GUID       = {0x5b1b31a1,  0x9562, 0x11d2, {0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 struct EFI_GUID EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID = {0x0964e5b22, 0x6459, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 struct EFI_GUID EFI_DEVICE_PATH_PROTOCOL_GUID        = {0x09576e91,  0x6d3f, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
-struct EFI_GUID EFI_FILE_INFO_ID                     = {0x09576e92,  0x6d3f, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
+struct EFI_GUID EFI_FILE_INFO_ID_GUI                 = {0x09576e92,  0x6d3f, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
 // We are forward declaring these structs so that the function typedefs can operate.
 struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
@@ -237,7 +237,6 @@ typedef enum EFI_TIMER_DELAY
 typedef struct EFI_MEMORY_DESCRIPTOR
 {
     UINT32                   Type;
-    UINT32                   Padding;
     EFI_PHYSICAL_ADDRESS     PhysicalStart;
     EFI_VIRTUAL_ADDRESS      VirtualStart;
     UINT64                   NumberOfPages;
@@ -493,23 +492,6 @@ typedef struct EFI_RUNTIME_SERVICES
     EFI_QUERY_CAPSULE_CAPABILITIES      QueryCapsuleCapabilities;
     EFI_QUERY_VARIABLE_INFO             QueryVariableInfo;
 } EFI_RUNTIME_SERVICES;
-
-
-// UEFI 2.9 Specs PDF Page 515
-/* Open Modes */
-#define EFI_FILE_MODE_READ     0x0000000000000001
-#define EFI_FILE_MODE_WRITE    0x0000000000000002
-#define EFI_FILE_MODE_CREATE   0x8000000000000000
-
-/* File Attributes */
-#define EFI_FILE_READ_ONLY    0x0000000000000001
-#define EFI_FILE_HIDDEN       0x0000000000000002
-#define EFI_FILE_SYSTEM       0x0000000000000004
-#define EFI_FILE_RESERVED     0x0000000000000008
-#define EFI_FILE_DIRECTORY    0x0000000000000010
-#define EFI_FILE_ARCHIVE      0x0000000000000020
-#define EFI_FILE_VALID_ATTR   0x0000000000000037
-
 
 typedef EFI_STATUS (*EFI_FILE_OPEN)(struct EFI_FILE_PROTOCOL* This, struct EFI_FILE_PROTOCOL **NewHandle, CHAR16 *FileName, UINT64 OpenMode, UINT64 Attributes);
 typedef EFI_STATUS (*EFI_FILE_CLOSE)(struct EFI_FILE_PROTOCOL* This);

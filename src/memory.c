@@ -7,19 +7,15 @@
 
 void* memcpy(void* destination, const void* source, size_t size)
 {
-    u8* dest = (u8 *) destination;
-    const u8* src = (const u8 *) source;
-
     for (size_t i = 0; i < size; ++i)
-        dest[i] = src[i];
+        ((u8*) destination)[i] = ((const u8*) source)[i];
     return destination;
 }
 
-void* memset(void* destination, int value, size_t size)
+void* memset(void* source, int value, size_t size)
 {
-    u8* dest = (u8 *) destination;
-
-    for (size_t i = 0; i < size; ++i)
-        dest[i] = (i8) value;
-    return destination;
+    u8* pointer = (u8 *) source;
+    while (size--)
+        *pointer++ = (unsigned char) value;
+    return source;
 }

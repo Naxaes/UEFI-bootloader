@@ -1,17 +1,6 @@
-# UEFI-Bootloader
-
 ## Info
 
 UEFI uses a subset of the PE32+ image format with a modified header signature (COFF?), which is Microsoft ABI compliant ([UEFI-spec, p.15](./UEFI-Spec-2-9_2021-03-18.pdf)). This project is one of the three supported UEFI images, namely a UEFI application (subsystem 10).
-
-The bootloader's work is to do the following:
-
-1. Initialize the screen.
-2. Initialize the keyboard.
-3. Initialize the graphics.
-4. Initialize the file system.
-5. Load the default font.
-6. Load the kernel.
 
 ## Setup
 
@@ -143,23 +132,10 @@ And it must during calls to runtime services have the following:
 When using `objdump -O binary` it'll put the text section in a flat binary. However, if you define functions before main, then they'll be put before main, meaning that the "entry point" is no longer at the start of the binary file. To fix this, compile with `-ffunction-sections` to put each function in a different section and then use a linker script that puts the section containing main at the top of the file.
 
 
+
+
 # Problems
 
 ### _"cp: drive/default-font.psf: could not copy extended attributes to /tmp/mnt/default-font.psf: Operation not supported_"
 
 On MacOS, if a file has extended attributes (denoted by @ after the permissions when doing `ls -l`) the `cp` might fail. Do `xattr -c <file>` on the file to remove the extended attributes. 
-
-
-
-# Kernel
-
-## Info
-
-The kernel needs to do the following on start-up:
-
-1. Set the GDT (Global Descriptor Table).
-2. Set the IDT (Interrupt Descriptor Table).
-
-
-### GDT (Global Descriptor Table)
-

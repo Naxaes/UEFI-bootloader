@@ -1,9 +1,9 @@
-#include "efi_main.h"
+extern EFI_SYSTEM_TABLE*      g_SystemTable;
+extern EFI_BOOT_SERVICES*     g_BootServices;
+extern EFI_RUNTIME_SERVICES*  g_RuntimeServices;
 
-#include "format.c"
 
-#define EFI_ASSERT(status) EfiAssert(status, (const CHAR16*) FILE_WCHAR, __LINE__)
-void EfiAssert(EFI_STATUS status, const CHAR16* file, int line);
+#include "../format.c"
 
 
 void EfiHalt()
@@ -16,22 +16,17 @@ void EfiHalt()
 }
 
 
-void EfiDelay(UINTN ms)
-{
-    // The Stall function is set as microseconds. We stall 1 microsecond.
-    EFI_ASSERT(g_BootServices->Stall(ms));
-}
 
-
+/* ---- PRINT ---- */
 void EfiPrintString(const CHAR16* string)
 {
-    EFI_ASSERT(g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string));
+    g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string);
 }
 
 void EfiPrintChar(CHAR16 character)
 {
     CHAR16 string[] = { character, L'\0' };
-    EFI_ASSERT(g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string));
+    g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string);
 }
 
 void EfiPrintF(const CHAR16* format, ...)
@@ -92,9 +87,7 @@ void EfiPrintF(const CHAR16* format, ...)
                     }
                 }
                 default:
-                {
                     return;
-                }
             }
             character++;
         }
@@ -104,17 +97,19 @@ void EfiPrintF(const CHAR16* format, ...)
 }
 
 
+#define EFI_ASSERT(status) EfiAssert(status, (const CHAR16*) FILE_WCHAR, __LINE__)
 void EfiAssert(EFI_STATUS status, const CHAR16* file, int line)
 {
     if ((status & EFI_ERROR) == EFI_ERROR)
     {
-        EFI_ASSERT(g_SystemTable->ConOut->SetAttribute(g_SystemTable->ConOut, EFI_RED));
+        g_SystemTable->ConOut->SetAttribute(g_SystemTable->ConOut, EFI_RED);
         EfiPrintF(L"[ASSERT FAILED] (%s:%d): '%s'\n\r", file, line, EfiErrorStringW(status));
         EfiHalt();
     }
 }
 
 
+/* ---- KEYBOARD ----*/
 EFI_STATUS EfiKeyboardPoll(EFI_INPUT_KEY* Key)
 {
     return g_SystemTable->ConIn->ReadKeyStroke(g_SystemTable->ConIn, Key);
@@ -127,6 +122,24 @@ void EfiKeyboardWait()
 }
 
 
+/* ---- CLOCK ---- */
+void EfiDelay(UINTN ms)
+{
+    // The Stall function is set as microseconds.
+    g_BootServices->Stall(ms);
+}
+
+void EfiPrintCurrentTime()
+{
+    EFI_TIME* Time = NULL;
+    EFI_ASSERT(g_BootServices->AllocatePool(EfiBootServicesData, sizeof(EFI_TIME), (void **)&Time));
+    EFI_ASSERT(g_RuntimeServices->GetTime(Time, NULL));
+    CHAR16 Hour[] = { L'0' + Time->Hour / 10, L'0' + Time->Hour % 10, 0 };
+    EfiPrintF(L"Current hour: %s\n\r", Hour);
+}
+
+
+/* ---- REBOOT ----*/
 void EfiHardwareReboot()
 {
     g_RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, 0);
@@ -140,71 +153,4 @@ void EfiSoftwareReboot()
 void EfiShutdown()
 {
     g_RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, 0);
-}
-
-
-EFI_FILE_PROTOCOL* EfiOpenFile(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume, CHAR16* Path)
-{
-    EFI_FILE_PROTOCOL* Root = NULL;
-    EFI_ASSERT(Volume->OpenVolume(Volume, &Root));
-
-    EFI_FILE_PROTOCOL* FileHandle = NULL;
-    EFI_ASSERT(Root->Open(Root, &FileHandle, Path, 0x01, 0));
-
-    return FileHandle;
-}
-
-
-u8* EfiReadFile(EFI_FILE_PROTOCOL* File, UINTN size)
-{
-//    UINTN FileInfoSize;
-//    EFI_FILE_INFO* FileInfo;
-//    File->GetInfo(File, &EFI_FILE_INFO_ID_GUI, &FileInfoSize, NULL);
-//    g_BootServices->AllocatePool(EfiLoaderData, FileInfoSize, (void**)&FileInfo);
-//    File->GetInfo(File, &EFI_FILE_INFO_ID_GUI, &FileInfoSize, (void**)&FileInfo);
-
-    u8* data = NULL;
-    EFI_ASSERT(g_BootServices->AllocatePool(
-            EfiLoaderData,
-            size,
-            (void **) &data
-    ));
-    EFI_ASSERT(File->Read(File, &size, data));
-
-    return data;
-}
-
-
-
-
-PSF1_Font EfiLoadFont(EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume)
-{
-    PSF1_Font font = { .scale=1 };
-
-    EFI_FILE_PROTOCOL* File = EfiOpenFile(Volume, L"default-font.psf");
-    if (File)
-    {
-        UINTN size = sizeof(PSF1_Header);
-        EFI_ASSERT(File->Read(File, &size, &font.header));
-
-        if (font.header.magic[0] != 0x36 || font.header.magic[1] != 0x04)
-        {
-            EfiPrintF(L"Wrong magic number for font!\n\r");
-            EfiHalt();
-        }
-
-        size = font.header.font_height * 256;
-        if (font.header.file_mode == 1)
-            size = font.header.font_height * 512;
-
-        EFI_ASSERT(File->SetPosition(File, sizeof(PSF1_Header)));
-        EFI_ASSERT(g_BootServices->AllocatePool(EfiLoaderData, size, (void**)&font.glyphs));
-        EfiPrintF(L"1    %zu  %zu\n\r", (u64) font.glyphs, size);
-        EFI_ASSERT(File->Read(File, &size, font.glyphs));
-
-    }
-
-    File->Close(File);
-
-    return font;
 }
