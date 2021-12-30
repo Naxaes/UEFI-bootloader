@@ -17,7 +17,7 @@ EFI_RUNTIME_SERVICES*  g_RuntimeServices;
 Graphics               g_Graphics;
 
 
-EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
+EFI_STATUS EfiMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
     /* ---- INITIALIZE STATICS ---- */
     // The System Table contains pointers to other standard tables that a loaded
@@ -59,8 +59,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
     g_Graphics.height = GraphicsOutput->Mode->Info->VerticalResolution;
     g_Graphics.pixels_per_scanline = GraphicsOutput->Mode->Info->PixelsPerScanLine;
 
-    EfiPrintF(L"---- UEFI bootloader up and running! ----\n\r");
-
 
     /* ---- INITIALIZE FILE SYSTEM ---- */
     EFI_FILE_PROTOCOL* RootFolder = NULL;
@@ -70,9 +68,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 
         EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume = NULL;
         EFI_ASSERT(g_BootServices->HandleProtocol(LoadedImage->DeviceHandle, &EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID, (void **) &Volume));
-
-        EfiPrintF(L"Image loaded at: %x\n\r", (usize) LoadedImage->ImageBase);
-        EfiPrintF(L"Image size:      %x\n\r", (usize) LoadedImage->ImageSize);
 
         EFI_ASSERT(Volume->OpenVolume(Volume, &RootFolder));
     }
@@ -91,7 +86,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
             EfiHalt();
         }
 
-        EfiPrintF(L"Loading font!\n\r");
         UINTN FontDataSize = sizeof(PSF1_Header);
         EFI_ASSERT(FontFile->Read(FontFile, &FontDataSize, &Font.header));
 
@@ -101,25 +95,19 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
             EfiHalt();
         }
 
-        EfiPrintF(L"Font validated!\n\r");
-
         FontDataSize = Font.header.font_height * 256;
         if (Font.header.file_mode == 1)
             FontDataSize = Font.header.font_height * 512;
 
         EFI_ASSERT(FontFile->SetPosition(FontFile, sizeof(PSF1_Header)));
         EFI_ASSERT(g_BootServices->AllocatePool(EfiLoaderData, FontDataSize, (void**)&Font.glyphs));
-        EfiPrintF(L"Size: %d\n\r", FontDataSize);
         EFI_ASSERT(FontFile->Read(FontFile, &FontDataSize, Font.glyphs));
-
-        EfiPrintF(L"Font Loaded!\n\r");
     }
 
     /* ---- LOAD KERNEL ---- */
     typedef __attribute__((sysv_abi)) int (*elf_main_fn)(Context*);
     elf_main_fn EntryPoint = NULL;
     {
-
         EFI_FILE_PROTOCOL* KernelFile = NULL;
         EFI_ASSERT(RootFolder->Open(RootFolder, &KernelFile, L"kernel", 0x01, 0));
 
@@ -159,16 +147,11 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
                 const uint8_t* source = KernelSource + Program->file_offset;
                 uint64_t source_size  = Program->file_size;
 
-                EfiPrintF(L"Sizes %d to %d\r\n", (u64)dest_size, source_size);
                 EFI_ASSERT(dest_size >= source_size ? EFI_SUCCESS : EFI_ERROR);
-
-                EfiPrintF(L"Mapping %x to %x\r\n", (u64)source, destination);
                 memcpy((void *)destination, source, source_size);
-                EfiPrintF(L"Done!\r\n");
             }
         }
 
-        EfiPrintF(L"Entry point: %x\r\n", Header->entry_point);
         void* EntryPointAddress = (void *) Header->entry_point;
         EntryPoint = (elf_main_fn) EntryPointAddress;
     }

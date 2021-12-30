@@ -21,7 +21,7 @@ disk=$( \
 mkdir -p /tmp/mnt
 mount -t msdos "${disk}" /tmp/mnt &> /dev/null
 
-cp build/release.BOOTX64.EFI /tmp/mnt/EFI/Boot/BOOTX64.EFI
+cp build/BOOTX64.EFI /tmp/mnt/EFI/Boot/BOOTX64.EFI
 cp drive/text.txt /tmp/mnt/text.txt
 cp drive/default-font.psf /tmp/mnt/default-font.psf
 cp build/kernel /tmp/mnt/kernel
