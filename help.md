@@ -1,6 +1,6 @@
 ## Info
 
-UEFI uses a subset of the PE32+ image format with a modified header signature (COFF?), which is Microsoft ABI compliant ([UEFI-spec, p.15](./UEFI-Spec-2-9_2021-03-18.pdf)). This project is one of the three supported UEFI images, namely a UEFI application (subsystem 10).
+UEFI uses a subset of the PE32+ image format with a modified occupied_pages signature (COFF?), which is Microsoft ABI compliant ([UEFI-spec, p.15](./UEFI-Spec-2-9_2021-03-18.pdf)). This project is one of the three supported UEFI images, namely a UEFI application (subsystem 10).
 
 ## Setup
 
@@ -77,6 +77,8 @@ The kernel can be compiled with debug information, the bootloader only cares abo
 
 * https://tianocore-training.github.io/Lesson-0/
 * https://tianocore-training.github.io/Lesson-1/
+
+https://github.com/jarlostensen/josx64/blob/master/kernel/pagetables.c
 
 
 ## Platform initialization

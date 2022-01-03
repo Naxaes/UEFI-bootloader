@@ -17,7 +17,7 @@ char* usize_to_string(char* buffer, usize n, usize base)
     while (1)
     {
         usize reminder = n % base;
-        buffer[i++] = (reminder < 10) ? ('0' + reminder) : ('A' + reminder - 10);
+        buffer[i++] = (reminder < 10) ? ('0' + (char) reminder) : ('A' + (char) reminder - 10);
 
         if (!(n /= base))
             break;

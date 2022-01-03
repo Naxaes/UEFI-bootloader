@@ -9,7 +9,7 @@ typedef enum ElfResult {
 } ElfResult;
 
 
-ElfResult is_elf64(const uint8_t* source)
+inline ElfResult is_elf64(const uint8_t* source)
 {
     if (source[4] == 1)
         return ELF_NO;
@@ -18,9 +18,6 @@ ElfResult is_elf64(const uint8_t* source)
     else
         return ELF_ERROR;  // Invalid
 }
-
-
-//ElfResult load_elf64(const uint8_t* data);
 
 
 typedef struct Elf64Header {
@@ -59,7 +56,7 @@ typedef struct Elf64ProgramHeader {
 
 
 typedef struct Elf64SectionHeader {
-    uint32_t name;      // Offset into section header->section_name_index.
+    uint32_t name;      // Offset into section occupied_pages->section_name_index.
     uint32_t type;      // 4 = rela
     uint64_t flags;
     uint64_t address;
@@ -76,13 +73,13 @@ typedef struct Elf64SectionHeader {
 
 
 // ---- PROGRAM TYPES ----
-const uint32_t PT_NULL    = 0x00000000;  // Program header table entry unused.
+const uint32_t PT_NULL    = 0x00000000;  // Program occupied_pages table entry unused.
 const uint32_t PT_LOAD    = 0x00000001;  // Loadable segment.
 const uint32_t PT_DYNAMIC = 0x00000002;  // Dynamic linking information.
 const uint32_t PT_INTERP  = 0x00000003;  // Interpreter information.
 const uint32_t PT_NOTE    = 0x00000004;  // Auxiliary information.
 const uint32_t PT_SHLIB   = 0x00000005;  // Reserved.
-const uint32_t PT_PHDR    = 0x00000006;  // Segment containing program header table itself.
+const uint32_t PT_PHDR    = 0x00000006;  // Segment containing program occupied_pages table itself.
 const uint32_t PT_TLS     = 0x00000007;  // Thread-Local Storage template.
 const uint32_t PT_LOOS    = 0x60000000;  // Reserved inclusive range. Operating system specific.
 const uint32_t PT_HIOS    = 0x6FFFFFFF;  // Reserved inclusive range. Operating system specific.
@@ -92,7 +89,7 @@ const uint32_t PT_HIPROC  = 0x7FFFFFFF;  // Reserved inclusive range. Processor 
 
 // ---- SECTION TYPES ----
 // https://refspecs.linuxfoundation.org/LSB_3.0.0/LSB-PDA/LSB-PDA.junk/sections.html
-const uint32_t SHT_NULL          = 0x0;    // This value marks the section header as inactive; it does not have an associated section. Other members of the section header have undefined values.
+const uint32_t SHT_NULL          = 0x0;    // This value marks the section occupied_pages as inactive; it does not have an associated section. Other members of the section occupied_pages have undefined values.
 const uint32_t SHT_PROGBITS      = 0x1;    // The section holds information defined by the program, whose format and meaning are determined solely by the program.
 const uint32_t SHT_SYMTAB        = 0x2;    // This section holds a symbol table. Currently, an object file may have either a section of SHT_SYMTAB type or a section of SHT_DYNSYM type, but not both. This restriction may be relaxed in the future. Typically, SHT_SYMTAB provides symbols for link editing, though it may also be used for dynamic linking. As a complete symbol table, it may contain many symbols unnecessary for dynamic linking.
 const uint32_t SHT_STRTAB        = 0x3;    // The section holds a string table. An object file may have multiple string table sections. See `String Table' below for details.

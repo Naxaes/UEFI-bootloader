@@ -1,0 +1,1 @@
+#define ARRAY_COUNT(x) (sizeof(x) / sizeof(*(x)))

@@ -1,0 +1,3 @@
+[submodule "src/c-preamble"]
+	path = src/c-preamble
+	url = https://github.com/Naxaes/c-preamble

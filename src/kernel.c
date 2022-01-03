@@ -1,7 +1,8 @@
 #include <stdarg.h>
 
+#include "preamble.h"
 #include "bootloader.h"
-#include "types.h"
+
 
 #include "memory.c"
 #include "stdio.c"
@@ -16,56 +17,8 @@
 #define OPTIONAL
 
 
-// ---- Bit stuff ----
+// ---- Bit hacks ----
 // https://www.youtube.com/watch?v=ZRNO-ewsNcQ
-#define BIT_SET(a, b)   ((a) |=  (1ULL << (b)))
-#define BIT_CLEAR(a, b) ((a) &= ~(1ULL << (b)))
-#define BIT_FLIP(a, b)  ((a) ^=  (1ULL << (b)))
-#define BIT_CHECK(a, b) (!!((a) & (1ULL << (b))))
-
-#define BITMASK_SET(x, mask)        ((x) |= (mask))
-#define BITMASK_CLEAR(x, mask)      ((x) &= (~(mask)))
-#define BITMASK_FLIP(x, mask)       ((x) ^= (mask))
-#define BITMASK_CHECK_ALL(x, mask)  (!(~(x) & (mask)))
-#define BITMASK_CHECK_ANY(x, mask)  ((x) & (mask))
-
-
-
-
-
-
-void debug_halt();
-void printf(const char* format, ...);
-#define PANIC(...)                                                             \
-    do {                                                                       \
-        printf(                                                                \
-            "[Panic]:\n"                                                       \
-            "\tFile:     %s\n"                                                 \
-            "\tLine:     %d\n"                                                 \
-            "\tMessage:  ",                                                    \
-            __FILE__, __LINE__                                                 \
-        );                                                                     \
-        printf(__VA_ARGS__);                                                   \
-        debug_halt();                                                          \
-    } while (0)
-
-#define ASSERT(statement, ...)                                                 \
-    do {                                                                       \
-        if (!(statement))                                                      \
-        {                                                                      \
-            printf(                                                            \
-                "[Assert] (%s):\n"                                             \
-                "\tFile:     %s\n"                                             \
-                "\tLine:     %d\n"                                             \
-                "\tMessage:  ",                                                \
-                #statement, __FILE__, __LINE__                                 \
-            );                                                                 \
-            printf(__VA_ARGS__);                                               \
-            debug_halt();                                                      \
-        }                                                                      \
-    } while (0)
-
-
 
 typedef struct Cursor
 {
@@ -86,6 +39,15 @@ typedef struct Font
     u8*  glyphs;
 } Font;
 
+
+void debug_break()
+{
+    // Change to 0 in debugger to continue.
+    int volatile wait = 1;
+    while (wait) {
+        __asm__ __volatile__("pause");
+    }
+}
 
 Graphics*  g_graphics   = NULL;
 Cursor*    g_cursor     = NULL;
@@ -173,7 +135,7 @@ void print_char(char character)
     advance_cursor(1);
 }
 
-void printf(const char* format, ...)
+int printf(const char* format, ...)
 {
     va_list arg;
     va_start(arg, format);
@@ -214,7 +176,7 @@ void printf(const char* format, ...)
                     }
                     else
                     {
-                        PANIC("Not implemented '%s'\n", character);
+                        PANICF("Not implemented '%s'\n", character);
                     }
                 }
                 break;
@@ -233,7 +195,7 @@ void printf(const char* format, ...)
                         if (d < 0) print_char('-');
                         u32 u = abs32(d);
                         char buffer[20];
-                        printf(usize_to_string(buffer, u, 10));
+                        printf("%s", usize_to_string(buffer, u, 10));
                         break;
                     }
                     case L'o':  // int - octal
@@ -243,7 +205,8 @@ void printf(const char* format, ...)
                     case L's':  // null-terminated string
                     {
                         char* s = va_arg(arg, char*);
-                        printf(s);  // TODO(ted): Safe? This allow non-static `format.
+                        while (*s != '\0')
+                            print_char(*s++);
                         break;
                     }
                     case L'x':  // int - hexadecimal
@@ -252,7 +215,7 @@ void printf(const char* format, ...)
                         print_char('x');
                         usize x = va_arg(arg, usize);
                         char buffer[20];
-                        printf(usize_to_string(buffer, x, 16));
+                        printf("%s", usize_to_string(buffer, x, 16));
                         break;
                     }
                     case L'z':  // size_t or ssize_t
@@ -262,7 +225,16 @@ void printf(const char* format, ...)
                             ++character;
                             usize zu = va_arg(arg, usize);
                             char buffer[20];
-                            printf(usize_to_string(buffer, zu, 10));
+                            printf("%s", usize_to_string(buffer, zu, 10));
+                            break;
+                        }
+                        else if (*(character+1) == L'x')
+                        {
+                            print_char('0');
+                            print_char('x');
+                            usize x = va_arg(arg, usize);
+                            char buffer[20];
+                            printf("%s", usize_to_string(buffer, x, 16));
                             break;
                         }
                         else
@@ -271,14 +243,14 @@ void printf(const char* format, ...)
                             if (z < 0) print_char('-');
                             u64 zu = abs64(z);
                             char buffer[20];
-                            printf(usize_to_string(buffer, zu, 10));
+                            printf("%s", usize_to_string(buffer, zu, 10));
                             break;
                         }
                     }
                     default:
                     {
-                        ASSERT(0, "Unknown format option %s\n", character);
-                        return;
+                        LOGF("Unknown format option %s\n", character);
+                        return -1;
                     }
                 }
                 break;
@@ -291,6 +263,7 @@ void printf(const char* format, ...)
     }
 
     va_end(arg);
+    return 0;
 }
 #define dprintf(format, ...) printf(ANSI_COLOR_CODE_RED format ANSI_COLOR_CODE_NORMAL, __VA_ARGS__)
 
@@ -321,50 +294,17 @@ void delay()
 }
 
 
-
-void debug_halt()
-{
-    // Change to 0 in debugger to continue.
-    int volatile wait = 1;
-    while (wait) {
-        __asm__ __volatile__("pause");
-    }
-}
-
-
-
-void print_memory_map(const Memory* memory)
-{
-    intn entries = memory->MemoryMapSize / memory->DescriptorSize;
-    intn base    = (u64) memory->MemoryMap;
-
-    printf("Memory mappings:\n");
-    for (intn i = 0; i < entries; ++i)
-    {
-        EFI_MEMORY_DESCRIPTOR* descriptor = (EFI_MEMORY_DESCRIPTOR*)(base + memory->DescriptorSize * i);
-
-        printf(
-            "%s: %x KiB (%x -> %x)\n",
-            EFI_MEMORY_TYPE_STRINGS_CHAR[descriptor->Type],
-            descriptor->NumberOfPages * 4096 / 1024,
-            descriptor->PhysicalStart,
-            descriptor->VirtualStart
-        );
-    }
-}
-
-
 typedef struct Bitmap {
     u8*   base;
     usize size;
 } Bitmap;
 
-intn is_set(const Bitmap* bitmap, usize index)
+usize is_set(const Bitmap* bitmap, usize index)
 {
     usize j = index / 8;
     usize i = index % 8;
 
-    intn result = BIT_CHECK(bitmap->base[j], i);
+    usize result = BIT_CHECK(bitmap->base[j], i);
     return result;
 }
 
@@ -382,139 +322,6 @@ void unset(Bitmap* bitmap, usize index)
 
     BIT_CLEAR(bitmap->base[j], i);
 }
-
-
-typedef struct PageAllocator {
-    Bitmap header;
-    u8*    base;
-    usize  size;
-} PageAllocator;
-
-
-usize g_total_memory    = 0;
-usize g_used_memory     = 0;
-usize g_free_memory     = 0;
-usize g_reserved_memory = 0;
-
-
-/// Make page marked as used for conventional usage.
-void lock_page(PageAllocator* allocator, void* address)
-{
-    usize index = (usize) (address) / PAGE_SIZE;
-    ASSERT(is_set(&allocator->header, index), "Page already locked!");
-    set(&allocator->header, index);
-    g_free_memory -= PAGE_SIZE;
-    g_used_memory += PAGE_SIZE;
-}
-void lock_pages(PageAllocator* allocator, void* address, usize count)
-{
-    for (usize i = 0; i < count; ++i)
-        lock_page(allocator, (void *) ((usize) (address) + count * PAGE_SIZE));
-}
-
-/// Make page available from conventional usage.
-void free_page(PageAllocator* allocator, void* address)
-{
-    usize index = (usize) (address) / PAGE_SIZE;
-    ASSERT(!is_set(&allocator->header, index), "Page already free!");
-    unset(&allocator->header, index);
-    g_free_memory += PAGE_SIZE;
-    g_used_memory -= PAGE_SIZE;
-}
-void free_pages(PageAllocator* allocator, void* address, usize count)
-{
-    for (usize i = 0; i < count; ++i)
-        free_page(allocator, (void *) ((usize) (address) + count * PAGE_SIZE));
-}
-
-/// Make page marked as used for internal/reserved usage.
-void reserve_page(PageAllocator* allocator, void* address)
-{
-    usize index = (usize) (address) / PAGE_SIZE;
-    ASSERT(is_set(&allocator->header, index), "Page already reserved!");
-    set(&allocator->header, index);
-    g_free_memory     -= PAGE_SIZE;
-    g_reserved_memory += PAGE_SIZE;
-}
-void reserve_pages(PageAllocator* allocator, void* address, usize count)
-{
-    for (usize i = 0; i < count; ++i)
-        reserve_page(allocator, (void *) ((usize) (address) + count * PAGE_SIZE));
-}
-
-/// Make page available from internal/reserved usage.
-void release_page(PageAllocator* allocator, void* address)
-{
-    usize index = (usize) (address) / PAGE_SIZE;
-    ASSERT(!is_set(&allocator->header, index), "Page already released!");
-    unset(&allocator->header, index);
-    g_free_memory     += PAGE_SIZE;
-    g_reserved_memory -= PAGE_SIZE;
-}
-void release_pages(PageAllocator* allocator, void* address, usize count)
-{
-    for (usize i = 0; i < count; ++i)
-        release_page(allocator, (void *) ((usize) (address) + count * PAGE_SIZE));
-}
-
-PageAllocator memory_map(const Memory* memory)
-{
-    //
-    intn entries = memory->MemoryMapSize / memory->DescriptorSize;
-    intn base    = (u64) memory->MemoryMap;
-
-    u8*   largest_memory_segment = NULL;
-    usize largest_memory_size    = 0;
-
-    usize total_memory_size = 0;
-    usize total_free_memory_size = 0;
-    usize total_reserved_memory_size = 0;
-
-    for (intn i = 0; i < entries; ++i)
-    {
-        EFI_MEMORY_DESCRIPTOR* descriptor = (EFI_MEMORY_DESCRIPTOR *)(base + memory->DescriptorSize * i);
-        usize memory_size = descriptor->NumberOfPages * PAGE_SIZE;
-
-        printf("%s at %x with %d pages\n", EFI_MEMORY_TYPE_STRINGS_CHAR[descriptor->Type], descriptor->PhysicalStart, descriptor->NumberOfPages);
-
-        total_memory_size += memory_size;
-        if (descriptor->Type == EfiConventionalMemory)
-        {
-            total_free_memory_size += memory_size;
-            if (descriptor->NumberOfPages * PAGE_SIZE > largest_memory_size)
-            {
-                largest_memory_segment = (u8 *) descriptor->PhysicalStart;
-                largest_memory_size    = memory_size;
-            }
-        }
-        else
-        {
-            total_reserved_memory_size += memory_size;
-        }
-    }
-
-    usize bitmap_size = total_memory_size / PAGE_SIZE / 8 + 1;
-
-    // TODO(ted): Align.
-    Bitmap bitmap = { largest_memory_segment, bitmap_size };
-    PageAllocator allocator = { bitmap, largest_memory_segment + bitmap_size, largest_memory_size - bitmap_size };
-
-    g_total_memory    = total_memory_size;
-    g_free_memory     = total_free_memory_size;
-    g_reserved_memory = total_reserved_memory_size;
-    g_used_memory     = bitmap_size;
-
-    printf(
-        "Total memory:    %d Kib\n"
-        "Free memory:     %d Kib\n"
-        "Reserved memory: %d Kib\n"
-        "Used memory:     %d Kib\n",
-        g_total_memory / 1024, g_free_memory / 1024, g_reserved_memory / 1024, g_used_memory / 1024
-    );
-
-    return allocator;
-}
-
 
 
 /*
@@ -554,18 +361,17 @@ int _start(Context* context)
     x86_64_interrupt(3);
 
     fill(BLACK);
-    PageAllocator allocator = memory_map(&context->memory);
-    printf("Allocator: { base=%x, size=%x }\n", allocator.base, allocator.size);
+//    PageAllocator allocator = memory_map(&context->memory);
+//    printf("Allocator: { base=%zx, size=%zx }\n", (usize) allocator.base, (usize) allocator.size);
 
-
-    print_memory_map(&context->memory);
+    printf("%s\n", test);
 
     printf(
-        "Testing:\n\t" ANSI_COLOR_CODE_RED "c: %c" ANSI_COLOR_CODE_NORMAL "\n\td: %d\n\td: %d\n\ts: %s\n\tx: %x\n\tz: %z\n\tz: %z\n\tzu: %zu\n",
+        "Testing:\n\t" ANSI_COLOR_CODE_RED "c: %c" ANSI_COLOR_CODE_NORMAL "\n\td: %d\n\td: %d\n\ts: %s\n\tx: %x\n\tz: %d\n\tz: %d\n\tzu: %d\n",
         'X', 10, -10, "Hello", 0xdead, 4321, -4321, 4321
     );
 
-//    debug_halt();
+//    debug_break();
 
     printf(
         "\n"
@@ -581,7 +387,7 @@ int _start(Context* context)
     );
 
 
-//    debug_halt();
+//    debug_break();
     for (usize i = 0; i < context->graphics.size / sizeof(Pixel); ++i)
     {
         context->graphics.base[i] = (Pixel) { 0xFF, 0, 0xFF, 0xFF };

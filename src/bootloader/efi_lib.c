@@ -1,12 +1,16 @@
+#include "efi_lib.h"
+
+#include <stdarg.h>
+
+#include "efi_error.h"
+
 extern EFI_SYSTEM_TABLE*      g_SystemTable;
 extern EFI_BOOT_SERVICES*     g_BootServices;
 extern EFI_RUNTIME_SERVICES*  g_RuntimeServices;
 
-
 #include "../format.c"
 
-
-void EfiHalt()
+void debug_break()
 {
     // Change to 0 in debugger to continue.
     int volatile wait = 1;
@@ -29,7 +33,7 @@ void EfiPrintChar(CHAR16 character)
     g_SystemTable->ConOut->OutputString(g_SystemTable->ConOut, string);
 }
 
-void EfiPrintF(const CHAR16* format, ...)
+int printf(const CHAR16* format, ...)
 {
     va_list arg;
     va_start(arg, format);
@@ -49,8 +53,8 @@ void EfiPrintF(const CHAR16* format, ...)
             {
                 case L'c':
                 {
-                    CHAR16 i = va_arg(arg, int);  // Fetch char argument
-                    EfiPrintChar(i);
+                    int i = va_arg(arg, int);  // Fetch char argument
+                    EfiPrintChar((CHAR16) i);
                     break;
                 }
                 case L'd' :
@@ -61,7 +65,7 @@ void EfiPrintF(const CHAR16* format, ...)
                         i = -i;
                         EfiPrintChar(L'-');
                     }
-                    EfiPrintString(U64ToString(i, 10).data);
+                    EfiPrintString((const CHAR16 *) U64ToString((usize) i, 10).data);
                     break;
                 }
                 case L's':
@@ -72,8 +76,8 @@ void EfiPrintF(const CHAR16* format, ...)
                 }
                 case L'x':
                 {
-                    unsigned int i = va_arg(arg, unsigned int); //Fetch Hexadecimal representation
-                    EfiPrintString(ToHexStringTruncated(i).data);
+                    usize i = va_arg(arg, usize); //Fetch Hexadecimal representation
+                    EfiPrintString((const CHAR16 *) ToHexStringTruncated(i).data);
                     break;
                 }
                 case L'z':  // size_t or ssize_t
@@ -82,28 +86,32 @@ void EfiPrintF(const CHAR16* format, ...)
                     if (*character == L'u')
                     {
                         usize x = va_arg(arg, usize);
-                        EfiPrintString(U64ToString(x, 10).data);
+                        EfiPrintString((const CHAR16 *) U64ToString(x, 10).data);
                         break;
+                    }
+                    else
+                    {
+                        return -1;
                     }
                 }
                 default:
-                    return;
+                    return -1;
             }
             character++;
         }
     }
 
     va_end(arg);
+    return 0;
 }
 
 
-#define EFI_ASSERT(status) EfiAssert(status, (const CHAR16*) FILE_WCHAR, __LINE__)
 void EfiAssert(EFI_STATUS status, const CHAR16* file, int line)
 {
     if ((status & EFI_ERROR) == EFI_ERROR)
     {
         g_SystemTable->ConOut->SetAttribute(g_SystemTable->ConOut, EFI_RED);
-        EfiPrintF(L"[ASSERT FAILED] (%s:%d): '%s'\n\r", file, line, EfiErrorStringW(status));
+        EfiPrintF(L"[ASSERT FAILED] (%s:%d): '%s'\n\r", file, line, EfiErrorString(status));
         EfiHalt();
     }
 }

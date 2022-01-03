@@ -61,43 +61,43 @@ GDT:
        db 10010010b    ; 1st flags, type flags
        db 10100000b    ; 2nd flags, Limit (bits 16-19)
        db 0x0          ; Base (bits 24-31)
-
-   ; The user code segment descriptor.
-   .USER_CODE:
-       dw 0x0          ; Limit (bits 0-15)
-       dw 0x0          ; Base  (bits 0-15)
-       db 0x0          ; Base  (bits 16-23)
-       db 10011010b    ; 1st flags, type flags
-       db 10100000b    ; 2nd flags, Limit (bits 16-19)
-       db 0x0          ; Base (bits 24-31)
-
-   ; The user data segment descriptor.
-   .USER_DATA:
-       dw 0x0          ; Limit (bits 0-15)
-       dw 0x0          ; Base  (bits 0-15)
-       db 0x0          ; Base  (bits 16-23)
-       db 10010010b    ; 1st flags, type flags
-       db 10100000b    ; 2nd flags, Limit (bits 16-19)
-       db 0x0          ; Base (bits 24-31)
-
-
-   ; The TSS low section segment descriptor.
-   .TSS_LOW:
-       dw 0x0          ; Limit (bits 0-15)
-       dw 0x0          ; Base  (bits 0-15)
-       db 0x0          ; Base  (bits 16-23)
-       db 10011010b    ; 1st flags, type flags
-       db 10001001b    ; 2nd flags, Limit (bits 16-19)
-       db 0x0          ; Base (bits 24-31)
-
-   ; The TSS high section segment descriptor.
-   .TSS_HIGH:
-       dw 0x0          ; Limit (bits 0-15)
-       dw 0x0          ; Base  (bits 0-15)
-       db 0x0          ; Base  (bits 16-23)
-       db 0x0          ; 1st flags, type flags
-       db 0x0          ; 2nd flags, Limit (bits 16-19)
-       db 0x0          ; Base (bits 24-31)
+;
+;   ; The user code segment descriptor.
+;   .USER_CODE:
+;       dw 0x0          ; Limit (bits 0-15)
+;       dw 0x0          ; Base  (bits 0-15)
+;       db 0x0          ; Base  (bits 16-23)
+;       db 10011010b    ; 1st flags, type flags
+;       db 10100000b    ; 2nd flags, Limit (bits 16-19)
+;       db 0x0          ; Base (bits 24-31)
+;
+;   ; The user data segment descriptor.
+;   .USER_DATA:
+;       dw 0x0          ; Limit (bits 0-15)
+;       dw 0x0          ; Base  (bits 0-15)
+;       db 0x0          ; Base  (bits 16-23)
+;       db 10010010b    ; 1st flags, type flags
+;       db 10100000b    ; 2nd flags, Limit (bits 16-19)
+;       db 0x0          ; Base (bits 24-31)
+;
+;
+;   ; The TSS low section segment descriptor.
+;   .TSS_LOW:
+;       dw 0x0          ; Limit (bits 0-15)
+;       dw 0x0          ; Base  (bits 0-15)
+;       db 0x0          ; Base  (bits 16-23)
+;       db 10011010b    ; 1st flags, type flags
+;       db 10001001b    ; 2nd flags, Limit (bits 16-19)
+;       db 0x0          ; Base (bits 24-31)
+;
+;   ; The TSS high section segment descriptor.
+;   .TSS_HIGH:
+;       dw 0x0          ; Limit (bits 0-15)
+;       dw 0x0          ; Base  (bits 0-15)
+;       db 0x0          ; Base  (bits 16-23)
+;       db 0x0          ; 1st flags, type flags
+;       db 0x0          ; 2nd flags, Limit (bits 16-19)
+;       db 0x0          ; Base (bits 24-31)
 
    ; The GDT descriptor.
    .DESCRIPTOR:
