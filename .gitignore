@@ -1,0 +1,11 @@
+# Project
+build/
+
+
+# Platform
+.DS_Store
+
+
+# IDE
+.idea/
+cmake-build-debug/
